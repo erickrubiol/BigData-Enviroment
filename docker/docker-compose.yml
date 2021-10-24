@@ -1,0 +1,125 @@
+version: "2"
+services:
+  spark-master:
+    image: bde2020/spark-master:3.0.1-hadoop3.2
+    container_name: spark-master
+    ports:
+      - "8090:8080"
+      - "7077:7077"
+    networks:
+      - dwh-network
+    volumes:
+      - data:/opt/hadoopspark
+    environment: 
+      - INIT_DAEMON_STEP=setup_spark
+  spark-worker-1:
+    image: bde2020/spark-worker:3.0.1-hadoop3.2
+    container_name: spark-worker-1
+    depends_on: 
+      - spark-master
+    ports:
+      - "8081:8081"
+    networks:
+      - dwh-network
+    environment:
+      - 'SPARK_MASTER=spark://spark-master:7077'
+  spark-worker-2:
+    image: bde2020/spark-worker:3.0.1-hadoop3.2
+    container_name: spark-worker-2
+    depends_on: 
+      - spark-master
+    ports:
+      - "8082:8081"
+    networks:
+      - dwh-network    
+    environment:
+      - 'SPARK_MASTER=spark://spark-master:7077'
+  namenode:
+    image: bde2020/hadoop-namenode
+    container_name: namenode
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    environment:
+      - "CORE_CONF_fs_defaultFS=hdfs://namenode:9000"
+      - "CLUSTER_NAME=hadooptest"
+    networks:
+      - dwh-network   
+    volumes:
+      - data:/opt/hadoopspark
+  datanode:
+    image: bde2020/hadoop-datanode
+    container_name: datanode
+    environment:
+      - "CORE_CONF_fs_defaultFS=hdfs://namenode:9000"
+    networks:
+      - dwh-network
+  zookeeper:
+    hostname: zookeeper
+    container_name: zookeeper
+    image: 'bitnami/zookeeper:latest'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - dwh-network
+  nifi-node-1:
+    image: apache/nifi:latest
+    ports:
+      - 6980:8080
+    networks:
+      - dwh-network
+    environment:
+      - NIFI_WEB_HTTP_PORT=8080
+      - NIFI_CLUSTER_IS_NODE=true
+      - NIFI_CLUSTER_NODE_PROTOCOL_PORT=8082
+      - NIFI_ZK_CONNECT_STRING=zookeeper:2181
+      - NIFI_ELECTION_MAX_WAIT=1 min
+    volumes:
+      - data:/opt/hadoopspark
+  nifi-node-2:
+    image: apache/nifi:latest
+    ports:
+      - 6979:8080
+    networks:
+      - dwh-network
+    environment:
+      - NIFI_WEB_HTTP_PORT=8080
+      - NIFI_CLUSTER_IS_NODE=true
+      - NIFI_CLUSTER_NODE_PROTOCOL_PORT=8082
+      - NIFI_ZK_CONNECT_STRING=zookeeper:2181
+      - NIFI_ELECTION_MAX_WAIT=1 min
+    volumes:
+      - data:/opt/hadoopspark
+  nifi-node-3:
+    image: apache/nifi:latest
+    ports:
+      - 6978:8080
+    networks:
+      - dwh-network
+    environment:
+      - NIFI_WEB_HTTP_PORT=8080
+      - NIFI_CLUSTER_IS_NODE=true
+      - NIFI_CLUSTER_NODE_PROTOCOL_PORT=8082
+      - NIFI_ZK_CONNECT_STRING=zookeeper:2181
+      - NIFI_ELECTION_MAX_WAIT=1 min
+    volumes:
+      - data:/opt/hadoopspark
+  postgres:
+    image: 'postgres:latest'
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    volumes: 
+      - data:/opt/hadoopspark
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=example
+      - POSTGRES_DB=sales
+    networks:
+      - dwh-network
+volumes:
+  data:
+    external: true
+networks:
+  dwh-network:
+    driver: bridge
